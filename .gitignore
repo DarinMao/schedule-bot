@@ -1,0 +1,6 @@
+config.json
+mysql-config.json
+run.sh
+package-lock.json
+/private
+/node_modules
