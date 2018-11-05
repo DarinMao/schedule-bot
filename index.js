@@ -55,7 +55,7 @@ const format = humanizeDuration.humanizer({
 // used in parsing and using crontabs
 const cronParser = require("cron-parser");
 const schedule = require("node-schedule");
-const cronstrue = require("cronstrue");
+const prettyCron = require("prettycron");
 
 /**
  * DATABASE FETCH ----------------------------------------------------------------------------------------------------
@@ -171,7 +171,7 @@ function sendSchedule(channel, selectorInput, typeInput, dateInput, autoschedule
             break;
     }
     var timestamp = dateFormat(Date.now(), "yyyymmddHHMMss");
-    var filename = "./temp/" + timestamp + ".png";
+    var filename = "./images/" + timestamp + ".png";
     var requestArgs = "type=" + typeInput + "&date=" + dateFormat(date, "UTC:yyyy-mm-dd");
     var url = "https://schedules.sites.tjhsst.edu/?" + requestArgs;
     var webshotOptions = weekMonthOptions;
@@ -244,7 +244,7 @@ function setAutoSchedule(channel, selectorInput, typeInput, cronInput, deleteOld
     pool.query(setAutoQuery, [channel.id, selectorInput, typeInput, cronInput, deleteOld], (err, results, fields) => {
         if (err) console.log(err);
         // get pretty string from cron
-	    var prettyString = cronstrue.toString(cronInput);
+	    var prettyString = prettyCron.toString(cronInput);
 	    // give feedback to channel
         channel.send("Set autoschedule to send " + selectorInput + " " + typeInput + " schedule " + prettyString.charAt(0).toLowerCase() + prettyString.substring(1) + ((deleteOld) ? ", deleting old schedules" : ""));
         if (dev) console.log("Set autoschedule in channel " + channel.id);
@@ -253,7 +253,7 @@ function setAutoSchedule(channel, selectorInput, typeInput, cronInput, deleteOld
 
 // this function shows an autoschedule, given a channel object
 const showAutoQuery = "SELECT * FROM autoschedules WHERE channel_id = ?";
-function showAutoSchedule(channel) {
+function showAutoSchedule(channel, typeInput) {
 	if (autoschedules[channel.id] === undefined) {
 	    // if doesn't exist
 	    // send a message
@@ -264,13 +264,30 @@ function showAutoSchedule(channel) {
         var selector = autoschedules[channel.id].selector;
         // get type 
         var type = autoschedules[channel.id].type;
-        // get pretty string from cron
-        var prettyString = cronstrue.toString(autoschedules[channel.id].cron);
+        // get cron
+        var cron = autoschedules[channel.id].cron;
         // get delete old
         var deleteOld = autoschedules[channel.id].deleteOld;
-        // send to channel
-        channel.send("Autoschedule is set to send " + selector + " " + type + " schedule " + prettyString.charAt(0).toLowerCase() + prettyString.substring(1) + ((deleteOld) ? ", deleting old schedules" : ""));
-        if (dev) console.log("Showed autoschedule in channel " + channel.id);
+        switch (typeInput) {
+            case "definition":
+                // get pretty string from cron
+                var prettyString = prettyCron.toString(cron);
+                // send to channel
+                channel.send("Autoschedule is set to send " + selector + " " + type + " schedule " + prettyString.charAt(0).toLowerCase() + prettyString.substring(1) + ((deleteOld) ? ", deleting old schedules" : ""));
+                break;
+            case "command":
+                // get prefix
+                var prefix = prefixes[channel.guild.id];
+                // send to channel
+                channel.send("The command to set this channel's autoschedule is: ```" + prefix + "autoschedule set " + selector + " " + type + " " + cron + " " + ((deleteOld) ? " delete-old" : "") + "```");
+                break;
+            case "next":
+                // get next
+                var nextExec = prettyCron.getNext(cron);
+                // send to channel
+                channel.send("Autoschedule will fire " + nextExec.charAt(0).toLowerCase() + nextExec.substring(1));
+        }
+        if (dev) console.log("Showed autoschedule " + typeInput + " in channel " + channel.id);
     }
 }
 
@@ -489,7 +506,7 @@ client.on("message", async message => {
                 // if it's a valid selector, set it
                 selectorInput = arg;
             } else {
-                // invalid date, put the argument back (selector is optional)
+                // invalid selector, put the argument back (selector is optional)
                 args.unshift(arg);
                 // selector defaults to this
                 selectorInput = "this";
@@ -500,7 +517,7 @@ client.on("message", async message => {
                 // if it's a valid type, set it
                 typeInput = arg;
             } else {
-                // invalid date, stop execution and return
+                // invalid type, stop execution and return
                 message.channel.send("Invalid type!");
                 return;
             }
@@ -547,8 +564,23 @@ client.on("message", async message => {
         }
         if (command === "show") {
             // user has called autoschedule show
+            // get arguments
+            var typeInput;
+            var arg;
+            
+            // next argument
+            arg = args.shift();
+            if (["definition", "command", "next"].indexOf(arg) > -1) {
+                // if it's a valid type, set it
+                typeInput = arg;
+            } else {
+                // invalid type, put the argument back (type is optional)
+                args.unshift(arg);
+                // type defaults to definition
+                typeInput = "definition";
+            }
             // call show autoschedule
-            showAutoSchedule(message.channel);
+            showAutoSchedule(message.channel, typeInput);
             if (dev) console.log("Executed autoschedule show in channel " + message.channel.id + " by " + message.author.id);
         }
         if (command === "delete") {
@@ -573,11 +605,11 @@ client.on("message", async message => {
 			.addField(prefix + "ping", "Pings the bot")
 			.addField(prefix + "info", "Displays bot info")
 			.addField(prefix + "setprefix [*prefix*]", "Sets the bot command prefix for this guild (requires \"Manage Server\" permission)\n**prefix: **The prefix to use (will be truncated to 32 characters if needed)")
-			.addField(prefix + "schedule [*selector*] [*type*] [*date*]", "Gets schedule\n**selector: **Selects which schedule(last|this|next)\n**type: **Type of schedule (day|week|month, default: day)\n**date: **The date of the schedule (default: current date)")
+			.addField(prefix + "schedule [*selector*] [*type*] [*date*]", "Gets schedule\n**selector: **Selects which schedule (last | this | next, default: this)\n**type: **Type of schedule (day | week | month, default: day)\n**date: **The date of the schedule (default: current date)")
 			.addField(prefix + "autoschedule", "Automatically sends schedules periodically to the current channel (requires \"Manage Server\" permission)\n**This feature is currently in development; it may act in unexpected ways**")
 			.addField(prefix + "autoschedule set [*selector*] *type* *cron* [*flags*]", "Sets autoschedule in the current channel\n**selector: **A selector accepted by the schedule command\n**type: **A schedule type accepted by the schedule command\n**cron: **A valid crontab describing when to send the schedule\n[Graphical Crontab Editor](http://corntab.com/)\n**flags: **Extra options, separated by spaces\n- **delete-old: **deletes old schedules")
 			.addField(prefix + "autoschedule execute", "Triggers execution of saved autoschedule, regardless of scheduled execution time")
-			.addField(prefix + "autoschedule show", "Shows the autoschedule in the current channel")
+			.addField(prefix + "autoschedule show [*type*]", "Shows autoschedule information in the current channel\n**type: **Desired autoschedule information (definition | command | next, default: definition)")
 			.addField(prefix + "autoschedule delete", "Deletes the autoschedule from the current channel")
 			.addField("Notes", "- Commands do NOT work in DM.\n- Arguments in [square brackets] are optional\n- Do not include brackets when typing commands.\n- The prefix must not have any whitespace in it");
 		// send
