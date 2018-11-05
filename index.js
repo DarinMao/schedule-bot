@@ -215,13 +215,14 @@ function setAutoSchedule(channel, selectorInput, typeInput, cronInput, deleteOld
         var jobID = autoschedules[channel.id].jobID;
         // delete job
         deleteAutoScheduleJob(jobID);	
-        // update the definition, retaining jobID
+        // update the definition, retaining jobID and lastID
+        var lastID = autoschedules[channel.id].lastID;
         autoschedules[channel.id] = {
             selector: selectorInput,
 		    type: typeInput, 
 		    cron: cronInput, 
 		    deleteOld: deleteOld,
-		    lastID: null,
+		    lastID: lastID,
 		    jobID: jobID
 		};
     } else {
@@ -538,6 +539,12 @@ client.on("message", async message => {
             setAutoSchedule(message.channel, selectorInput, typeInput, cronInput, deleteOld);
             if (dev) console.log("Executed autochedule set in channel " + message.channel.id + " by " + message.author.id);
         }
+        if (command === "execute") {
+            // user has called autoschedule execute
+            // call execute autoschedule
+            executeAutoSchedule(message.channel.id);
+            if (dev) console.log("Executed autoschedule execute in channel " + message.channel.id + " by " + message.author.id);
+        }
         if (command === "show") {
             // user has called autoschedule show
             // call show autoschedule
@@ -569,6 +576,7 @@ client.on("message", async message => {
 			.addField(prefix + "schedule [*selector*] [*type*] [*date*]", "Gets schedule\n**selector: **Selects which schedule(last|this|next)\n**type: **Type of schedule (day|week|month, default: day)\n**date: **The date of the schedule (default: current date)")
 			.addField(prefix + "autoschedule", "Automatically sends schedules periodically to the current channel (requires \"Manage Server\" permission)\n**This feature is currently in development; it may act in unexpected ways**")
 			.addField(prefix + "autoschedule set [*selector*] *type* *cron* [*flags*]", "Sets autoschedule in the current channel\n**selector: **A selector accepted by the schedule command\n**type: **A schedule type accepted by the schedule command\n**cron: **A valid crontab describing when to send the schedule\n[Graphical Crontab Editor](http://corntab.com/)\n**flags: **Extra options, separated by spaces\n- **delete-old: **deletes old schedules")
+			.addField(prefix + "autoschedule execute", "Triggers execution of saved autoschedule, regardless of scheduled execution time")
 			.addField(prefix + "autoschedule show", "Shows the autoschedule in the current channel")
 			.addField(prefix + "autoschedule delete", "Deletes the autoschedule from the current channel")
 			.addField("Notes", "- Commands do NOT work in DM.\n- Arguments in [square brackets] are optional\n- Do not include brackets when typing commands.\n- The prefix must not have any whitespace in it");
