@@ -474,14 +474,6 @@ client.on("message", async message => {
     
     // AUTOSCHEDULE command
     if (command === "autoschedule") {
-        // check for permissions
-        // ALL autoschedule commands require the MANAGE_GUILD permission
-        // unless they're me
-        if (!message.member.hasPermission("MANAGE_GUILD") && message.author.id !== "288477253535399937") {
-			message.channel.send("You are not allowed to do that!");
-			return;
-		}
-		
 		// throw away the command, get the first argument and use that as the autoschedule action
         command = args.shift();
         
@@ -489,7 +481,17 @@ client.on("message", async message => {
             // user has called autoschedule with no action
             message.channel.send("Use autoschedule set, show, or delete");
             if (dev) console.log("Executed autoschedule in channel " + message.channel.id + " by " + message.author.id);
+            return;
         }
+        
+        // check for permissions
+        // ALL autoschedule commands except show require the MANAGE_GUILD permission
+        // unless they're me
+        if (!message.member.hasPermission("MANAGE_GUILD") && message.author.id !== "288477253535399937" && command !== "show") {
+			message.channel.send("You are not allowed to do that!");
+			return;
+		}
+        
         if (command === "set") {
             // user has called autoschedule set
             
