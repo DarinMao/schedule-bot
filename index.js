@@ -173,7 +173,7 @@ function sendSchedule(channel, selectorInput, typeInput, dateInput, autoschedule
     var timestamp = dateFormat(Date.now(), "yyyymmddHHMMss");
     var filename = "./images/" + timestamp + ".png";
     var requestArgs = "type=" + typeInput + "&date=" + dateFormat(date, "UTC:yyyy-mm-dd");
-    var url = "https://schedules.sites.tjhsst.edu/?" + requestArgs;
+    var url = "https://schedules.sites.tjhsst.edu/schedule/?" + requestArgs;
     var webshotOptions = weekMonthOptions;
     if (typeInput == "day") {
         webshotOptions = dayOptions;
@@ -435,36 +435,56 @@ client.on("message", async message => {
         
         // next argument
         arg = args.shift();
-        if (["last", "this", "next"].indexOf(arg) > -1) {
-            // if it's a valid selector, set it
-            selectorInput = arg;
-        } else {
-            // invalid type, put the argument back (type is optional)
-            args.unshift(arg);
-            // selector defaults to this
-            selectorInput = "this";
-        }
-        // next argument
-        arg = args.shift();
-        if (["day", "week", "month"].indexOf(arg) > -1) {
-            // if it's a valid type, set it
-            typeInput = arg;
-        } else {
-            // invalid type, put the argument back (type is optional)
-            args.unshift(arg);
-            // type defaults to "day"
+        if (["yesterday", "today", "tomorrow"].indexOf(arg) > -1) {
+            // if it's a valid keyword, set arguments
             typeInput = "day";
-        }
-        // next argument
-        arg = args.shift();
-        if (!isNaN(new Date(arg))) {
-            // if it's a valid date, set it
-            dateInput = arg;
-        } else {
-            // invalid date, put the argument back (date is optional)
-            args.unshift(arg);
-            // date defaults to current date
+            // date is current date
             dateInput = dateFormat(new Date(), "yyyy-mm-dd");
+            switch (arg) {
+                case "yesterday":
+                    selectorInput = "last";
+                    break;
+                case "today":
+                    selectorInput = "this";
+                    break;
+                case "tomorrow":
+                    selectorInput = "next";
+                    break;
+            }
+        } else {
+            // invalid keyword, continue processing
+            if (["last", "this", "next"].indexOf(arg) > -1) {
+                // if it's a valid selector, set it
+                selectorInput = arg;
+            } else {
+                // invalid type, put the argument back (type is optional)
+                args.unshift(arg);
+                // selector defaults to this
+                selectorInput = "this";
+            }
+            // next argument
+            arg = args.shift();
+            if (["day", "week", "month"].indexOf(arg) > -1) {
+                // if it's a valid type, set it
+                typeInput = arg;
+            } else {
+                // invalid type, put the argument back (type is optional)
+                args.unshift(arg);
+                // type defaults to "day"
+                typeInput = "day";
+            }
+            // next argument
+            arg = args.shift();
+            if (!isNaN(new Date(arg))) {
+                // if it's a valid date, set it
+                dateInput = arg;
+            } else {
+                // invalid date, put the argument back (date is optional)
+                args.unshift(arg);
+                // date defaults to current date
+                dateInput = dateFormat(new Date(), "yyyy-mm-dd");
+            }
+                
         }
         
         // call send schedule
@@ -504,24 +524,43 @@ client.on("message", async message => {
             
             // next argument
             arg = args.shift();
-            if (["last", "this", "next"].indexOf(arg) > -1) {
-                // if it's a valid selector, set it
-                selectorInput = arg;
+            if (["yesterday", "today", "tomorrow"].indexOf(arg) > -1) {
+                // if it's a valid keyword, set arguments
+                typeInput = "day";
+                // date is current date
+                dateInput = dateFormat(new Date(), "yyyy-mm-dd");
+                switch (arg) {
+                    case "yesterday":
+                        selectorInput = "last";
+                        break;
+                    case "today":
+                        selectorInput = "this";
+                        break;
+                    case "tomorrow":
+                        selectorInput = "next";
+                        break;
+                }
             } else {
-                // invalid selector, put the argument back (selector is optional)
-                args.unshift(arg);
-                // selector defaults to this
-                selectorInput = "this";
-            }
-            // next argument
-            arg = args.shift();
-            if (["day", "week", "month"].indexOf(arg) > -1) {
-                // if it's a valid type, set it
-                typeInput = arg;
-            } else {
-                // invalid type, stop execution and return
-                message.channel.send("Invalid type!");
-                return;
+                // invalid keyword, continue processing
+                if (["last", "this", "next"].indexOf(arg) > -1) {
+                    // if it's a valid selector, set it
+                    selectorInput = arg;
+                } else {
+                    // invalid selector, put the argument back (selector is optional)
+                    args.unshift(arg);
+                    // selector defaults to this
+                    selectorInput = "this";
+                }
+                // next argument
+                arg = args.shift();
+                if (["day", "week", "month"].indexOf(arg) > -1) {
+                    // if it's a valid type, set it
+                    typeInput = arg;
+                } else {
+                    // invalid type, stop execution and return
+                    message.channel.send("Invalid type!");
+                    return;
+                }
             }
             
             // cron is five arguments
@@ -607,9 +646,9 @@ client.on("message", async message => {
 			.addField(prefix + "ping", "Pings the bot")
 			.addField(prefix + "info", "Displays bot info")
 			.addField(prefix + "setprefix [*prefix*]", "Sets the bot command prefix for this guild (requires \"Manage Server\" permission)\n**prefix: **The prefix to use (will be truncated to 32 characters if needed)")
-			.addField(prefix + "schedule [*selector*] [*type*] [*date*]", "Gets schedule\n**selector: **Selects which schedule (last | this | next, default: this)\n**type: **Type of schedule (day | week | month, default: day)\n**date: **The date of the schedule (default: current date)")
+			.addField(prefix + "schedule {*keyword* | [*selector*] [*type*]} [*date*]", "Gets schedule\n**keyword: **Selects schedule and type (yesterday | today | tomorrow)\n**selector: **Selects which schedule (last | this | next, default: this)\n**type: **Type of schedule (day | week | month, default: day)\n**date: **The date of the schedule (default: current date)")
 			.addField(prefix + "autoschedule", "Automatically sends schedules periodically to the current channel (requires \"Manage Server\" permission)\n**This feature is currently in development; it may act in unexpected ways**")
-			.addField(prefix + "autoschedule set [*selector*] *type* *cron* [*flags*]", "Sets autoschedule in the current channel\n**selector: **A selector accepted by the schedule command\n**type: **A schedule type accepted by the schedule command\n**cron: **A valid crontab describing when to send the schedule\n[Graphical Crontab Editor](http://corntab.com/)\n**flags: **Extra options, separated by spaces\n- **delete-old: **deletes old schedules")
+			.addField(prefix + "autoschedule set {*keyword* | [*selector*] *type*} *cron* [*flags*]", "Sets autoschedule in the current channel\n**keyword: **A keyword accepted by the schedule command\n**selector: **A selector accepted by the schedule command\n**type: **A schedule type accepted by the schedule command\n**cron: **A valid crontab describing when to send the schedule\n[Graphical Crontab Editor](http://corntab.com/)\n**flags: **Extra options, separated by spaces\n- **delete-old: **deletes old schedules")
 			.addField(prefix + "autoschedule execute", "Triggers execution of saved autoschedule, regardless of scheduled execution time")
 			.addField(prefix + "autoschedule show [*type*]", "Shows autoschedule information in the current channel\n**type: **Desired autoschedule information (definition | command | next, default: definition)")
 			.addField(prefix + "autoschedule delete", "Deletes the autoschedule from the current channel")
