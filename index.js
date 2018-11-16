@@ -5,14 +5,6 @@ if (process.env.NODE_ENV == "dev") {
 }
 
 /**
- * TODO List
- * 
- * Fix all the autoschedule bugs
- * Fix all the delete last autoschedule bugs
- * 
- **/
-
-/**
  * IMPORT PACKAGES ----------------------------------------------------------------------------------------------------
  */
 
@@ -37,6 +29,10 @@ const weekMonthOptions = {
     shotSize: {width: "window", height: "all"}, 
     defaultWhiteBackground: true
 };
+const emergencyOptions = {
+    screenSize: {width: 700, height: 350},
+    shotSize: {width: "window", height: "all"}
+}
 
 // date formatter
 const dateFormat = require("dateformat");
@@ -143,6 +139,30 @@ function delGuild(guild) {
 	});
 }
 
+
+/**
+ * EMERGENCY SENDING ----------------------------------------------------------------------------------------------------
+ */
+
+function sendEmergency(channel) {
+    // this command takes a while to run, so start typing
+    channel.startTyping();
+    // create filename
+    var timestamp = dateFormat(Date.now(), "yyyymmddHHMMss");
+    var filename = "./images/emergency_" + channel.id + "_" + timestamp + ".png";
+    // webshot
+    webshot("https://schedules.sites.tjhsst.edu/emergency/", filename, emergencyOptions, (err) => {
+        // send it
+        channel.send(new Discord.Attachment(fs.createReadStream(filename), "emergency.png"))
+            .then(message => {
+                // delete the image
+                fs.unlink(filename, (err) => {});
+                if (dev) console.log("Sent emergency to channel " + channel.id);
+            });
+        channel.stopTyping();
+    });
+}
+
 /**
  * SCHEDULE SENDING ----------------------------------------------------------------------------------------------------
  */
@@ -157,6 +177,9 @@ function sendSchedule(channel, selectorInput, typeInput, dateInput) {
     sendSchedule(channel, selectorInput, typeInput, dateInput, false)
 }
 function sendSchedule(channel, selectorInput, typeInput, dateInput, autoscheduleSaveID) {
+    // this command takes a while to run, so start typing
+    channel.startTyping();
+    // set date using offset
     var date = new Date(dateInput);
     var offset = selectorOffset[selectorInput];
     switch (typeInput) {
@@ -170,18 +193,26 @@ function sendSchedule(channel, selectorInput, typeInput, dateInput, autoschedule
             date.setMonth(date.getMonth() + offset);
             break;
     }
+    // create filename
     var timestamp = dateFormat(Date.now(), "yyyymmddHHMMss");
-    var filename = "./images/" + timestamp + ".png";
+    var filename = "./images/schedule_" + channel.id + "_" + timestamp + ".png";
+    // create request argument string
     var requestArgs = "type=" + typeInput + "&date=" + dateFormat(date, "UTC:yyyy-mm-dd");
+    // build url
     var url = "https://schedules.sites.tjhsst.edu/schedule/?" + requestArgs;
     var webshotOptions = weekMonthOptions;
+    // set webshot options
     if (typeInput == "day") {
         webshotOptions = dayOptions;
     }
+    // webshot
     webshot(url, filename, webshotOptions, (err) => {
+        // send it
         channel.send(new Discord.Attachment(fs.createReadStream(filename), "schedule.png"))
             .then(message => {
+                // delete the image
                 fs.unlink(filename, (err) => {});
+                // save id if needed
                 if (autoscheduleSaveID) {
                     saveID(channel, message);
                 }
@@ -424,8 +455,6 @@ client.on("message", async message => {
     
     // SCHEDULE command
     if (command === "schedule") {
-        // this command takes a while to run, so start typing
-        message.channel.startTyping();
         
         // get arguments
         var selectorInput;
@@ -632,6 +661,12 @@ client.on("message", async message => {
         }
     }
     
+    // EMERGENCY command
+    if (command === "emergency") {
+        // call send emergency
+        sendEmergency(message.channel);
+    }
+    
     // HELP command
     if (command === "help") {
         // get the prefix to display it
@@ -647,11 +682,12 @@ client.on("message", async message => {
 			.addField(prefix + "info", "Displays bot info")
 			.addField(prefix + "setprefix [*prefix*]", "Sets the bot command prefix for this guild (requires \"Manage Server\" permission)\n**prefix: **The prefix to use (will be truncated to 32 characters if needed)")
 			.addField(prefix + "schedule {*keyword* | [*selector*] [*type*]} [*date*]", "Gets schedule\n**keyword: **Selects schedule and type (yesterday | today | tomorrow)\n**selector: **Selects which schedule (last | this | next, default: this)\n**type: **Type of schedule (day | week | month, default: day)\n**date: **The date of the schedule (default: current date)")
-			.addField(prefix + "autoschedule", "Automatically sends schedules periodically to the current channel (requires \"Manage Server\" permission)\n**This feature is currently in development; it may act in unexpected ways**")
+			.addField(prefix + "autoschedule", "Automatically sends schedules periodically to the current channel (requires \"Manage Server\" permission)\n")
 			.addField(prefix + "autoschedule set {*keyword* | [*selector*] *type*} *cron* [*flags*]", "Sets autoschedule in the current channel\n**keyword: **A keyword accepted by the schedule command\n**selector: **A selector accepted by the schedule command\n**type: **A schedule type accepted by the schedule command\n**cron: **A valid crontab describing when to send the schedule\n[Graphical Crontab Editor](http://corntab.com/)\n**flags: **Extra options, separated by spaces\n- **delete-old: **deletes old schedules")
 			.addField(prefix + "autoschedule execute", "Triggers execution of saved autoschedule, regardless of scheduled execution time")
 			.addField(prefix + "autoschedule show [*type*]", "Shows autoschedule information in the current channel\n**type: **Desired autoschedule information (definition | command | next, default: definition)")
 			.addField(prefix + "autoschedule delete", "Deletes the autoschedule from the current channel")
+			.addField(prefix + "emergency", "Gets emergency alerts")
 			.addField("Notes", "- Commands do NOT work in DM.\n- Arguments in [square brackets] are optional\n- Do not include brackets when typing commands.\n- The prefix must not have any whitespace in it");
 		// send
 		message.channel.send({embed})
