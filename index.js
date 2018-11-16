@@ -711,7 +711,7 @@ client.on("message", async message => {
 		// build embed
 		var embed = new Discord.RichEmbed()
 			.setTitle("TJHSST Schedule Bot")
-			.setDescription("This bot serves TJHSST bell schedules\nUse `" + prefix + "help` to view commands\n[Add TJHSST Schedule Bot to your own server](https://discordapp.com/oauth2/authorize?client_id=491431910795509780&scope=bot&permissions=51200)")
+			.setDescription("This bot serves TJHSST bell schedules\nUse `" + prefix + "help` to view commands\n[Add TJHSST Schedule Bot to your own server](https://discordapp.com/oauth2/authorize?client_id=491431910795509780&scope=bot&permissions=51200)\nCode on [GitHub](https://github.com/DarinMao/schedule-bot)")
 			.setColor(0x2d31ff)
 			.setFooter("Ailuropoda Melanoleuca#0068 | Written using discord.js", "https://i.imgur.com/tymDoDZ.jpg")
 			.setThumbnail("https://i.imgur.com/FXO2ASN.png")

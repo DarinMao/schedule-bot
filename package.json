@@ -1,6 +1,6 @@
 {
   "name": "schedule-bot",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Discord bot to serve schedules",
   "main": "index.js",
   "scripts": {
