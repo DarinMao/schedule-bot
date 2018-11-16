@@ -19,20 +19,11 @@ const client = new Discord.Client();
 // sets up webshot to get image of schedule
 // options are used to set the size of the image
 const webshot = require("webshot");
-const dayOptions = {
-    screenSize: {width: 250, height: 350},
-    shotSize: {width: "window", height: "all"}, 
+const webshotOptions = {
+    screenSize: {width: 1, height: 1},
+    shotSize: {width: "all", height: "all"}, 
     defaultWhiteBackground: true
 };
-const weekMonthOptions = {
-    screenSize: {width: 1200, height: 350},
-    shotSize: {width: "window", height: "all"}, 
-    defaultWhiteBackground: true
-};
-const emergencyOptions = {
-    screenSize: {width: 700, height: 350},
-    shotSize: {width: "window", height: "all"}
-}
 
 // date formatter
 const dateFormat = require("dateformat");
@@ -151,7 +142,7 @@ function sendEmergency(channel) {
     var timestamp = dateFormat(Date.now(), "yyyymmddHHMMss");
     var filename = "./images/emergency_" + channel.id + "_" + timestamp + ".png";
     // webshot
-    webshot("https://schedules.sites.tjhsst.edu/emergency/", filename, emergencyOptions, (err) => {
+    webshot("https://schedules.sites.tjhsst.edu/emergency/", filename, webshotOptions, (err) => {
         // send it
         channel.send(new Discord.Attachment(fs.createReadStream(filename), "emergency.png"))
             .then(message => {
@@ -200,11 +191,6 @@ function sendSchedule(channel, selectorInput, typeInput, dateInput, autoschedule
     var requestArgs = "type=" + typeInput + "&date=" + dateFormat(date, "UTC:yyyy-mm-dd");
     // build url
     var url = "https://schedules.sites.tjhsst.edu/schedule/?" + requestArgs;
-    var webshotOptions = weekMonthOptions;
-    // set webshot options
-    if (typeInput == "day") {
-        webshotOptions = dayOptions;
-    }
     // webshot
     webshot(url, filename, webshotOptions, (err) => {
         // send it
