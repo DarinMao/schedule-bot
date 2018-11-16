@@ -409,14 +409,12 @@ function saveID(channel, message) {
 client.on('guildCreate', guild => {
 	prefixes[guild.id] = "!";
 	saveGuild(guild, "!");
-	setServersStatus();
 });
 
 // remove prefix when guild is removed
 client.on('guildDelete', guild => {
 	delete prefixes[guild.id];
-	delGuild(guild)
-	setServersStatus();
+	delGuild(guild);
 });
 
 /**
@@ -761,7 +759,10 @@ client.on("message", async message => {
 // set server game status when logged in
 client.on("ready", () => {
     console.log("Logged in");
-    setServersStatus();
+    updateStatus();
+    setInterval(() => {
+	    updateStatus();
+	}, 10000);
 })
 
 // login to discord
@@ -771,13 +772,33 @@ client.login(config.token);
  * MISC OPERATIONS ----------------------------------------------------------------------------------------------------
  */
 
-// this function sets the playing status to number of guilds
-function setServersStatus() {
-    // get a string
-	var gameString = client.guilds.size + " guild";
-	// append an s if it's a big number
-	if (client.guilds.size != 1) gameString += "s";
-	client.user.setPresence({ game: {name: gameString, type: 0} });
+/**
+ * sets the playing status to
+ *  guilds
+ *  users
+ *  help command
+ */
+var statusIndex = 0;
+function updateStatus() {
+    if (statusIndex == 0) {
+    	var gameString = client.guilds.size + " guild";
+    	if (client.guilds.size != 1) gameString += "s";
+    	client.user.setActivity(gameString);
+    	if (dev) console.log("Changed to guilds status");
+    	statusIndex++;
+    }
+    else if (statusIndex == 1) {
+        var gameString = client.users.size + " user";
+        if (client.users.size != 1) gameString += "s";
+        client.user.setActivity(gameString);
+        if (dev) console.log("Changed to users status");
+        statusIndex++;
+    }
+    else if (statusIndex == 2) {
+        client.user.setActivity("use !help");
+        if (dev) console.log("Changed to help status");
+        statusIndex = 0;
+    }
 }
 
 // this function sends a message when permissions are missing
