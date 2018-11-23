@@ -54,9 +54,9 @@ const mysql = require("mysql");
 const mysqlConfig = require("./mysql-config.json");
 const pool = mysql.createPool(mysqlConfig);
 
-// this array stores prefixes
+// this array stores serverconfig
 // it is keyed by server id
-var prefixes = [];
+var serverconfig = [];
 
 // this array stores autoschedule definitions
 // it is keyed by channel id
@@ -66,14 +66,17 @@ var autoschedules = [];
 // it is keyed by job id, found in autoschedules
 var jobs = [];
 
-// GRAB PREFIXES FROM THE DATABASE
-pool.query("SELECT * FROM prefixes", (err, results, fields) => {
+// GRAB SERVER CONFIG FROM THE DATABASE
+pool.query("SELECT serverid,prefix,display_type FROM servers", (err, results, fields) => {
     if (err) throw err;
-    // loop through results, adding them to the prefix array
+    // loop through results, adding them to the servers array
     for (i = 0; i < results.length; i++) {
-		prefixes[results[i].serverid] = results[i].prefix;
+		serverconfig[results[i].serverid] = {
+	        prefix: results[i].prefix,
+	        display_type: results[i].display_type
+		};
 	}
-	console.log(prefixes);
+	console.log(serverconfig);
 	console.log("Loaded " + results.length + " prefixes");
 });
 
@@ -109,25 +112,67 @@ pool.query("SELECT * FROM autoschedules", (err, results, fields) => {
 });
 
 /**
- * PREFIX OPERATIONS ----------------------------------------------------------------------------------------------------
+ * GUILD OPERATIONS ----------------------------------------------------------------------------------------------------
  */
  
-// this function saves a prefix, given a guild object and a valid <=32 character prefix
-const saveGuildQuery = "INSERT INTO prefixes (serverid, prefix) VALUES (?, ?) ON DUPLICATE KEY UPDATE serverid = VALUES (serverid), prefix = VALUES (prefix);";
-function saveGuild(guild, prefix) {
-	pool.query(saveGuildQuery, [guild.id, prefix], (err, results, fields) => {
+// this function saves a guild, given a guild object, a valid <=32 character prefix, and a display type
+const saveGuildQuery = "INSERT INTO servers (serverid, prefix, display_type) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE serverid = VALUES (serverid), prefix = VALUES (prefix), display_type = VALUES (display_type);";
+function saveGuild(guild, prefix, displayType) {
+	pool.query(saveGuildQuery, [guild.id, prefix, displayType], (err, results, fields) => {
 	    if (err) console.log(err);
-	    if (dev) console.log("Guild " + guild.id + " saved with prefix " + prefix);
+	    if (dev) console.log("Guild " + guild.id + " saved with prefix " + prefix + " and display type " + displayType);
 	});
 }
 
-// this function deletes a prefix, given a guild object
-const delGuildQuery = "DELETE FROM prefixes WHERE serverid = ?";
+// this function deletes a guild, given a guild object
+const delGuildQuery = "DELETE FROM servers WHERE serverid = ?";
 function delGuild(guild) {
 	pool.query(delGuildQuery, [guild.id], (err, results, fields) => {
 	    if (err) console.log(err);
 	    if (dev) console.log("Guild " + guild.id + " deleted");
 	});
+}
+
+// this function sets a configuration field for a guild, given a channel, field, and value
+const setConfigQuery = "UPDATE servers SET ??=? WHERE serverid=?";
+function setConfig(channel, fieldInput, valueInput) {
+    var field;
+    var value;
+    switch (fieldInput) {
+        case "prefix":
+            field = "prefix";
+            value = valueInput.substring(0, 32);
+            break;
+        case "displaytype":
+            field = "display_type";
+            if (["image", "text"].indexOf(valueInput) > -1) {
+                value = valueInput;
+            } else {
+                channel.send("Invalid display type!");
+                return;
+            }
+            break;
+    }
+    serverconfig[channel.guild.id][field] = value;
+    pool.query(setConfigQuery, [field, value, channel.guild.id], (err, results, fields) => {
+        if (err) console.log(err);
+        if (dev) console.log("Saved guild " + field + " as " + value);
+    })
+    channel.send("Set '" + fieldInput + "' for this guild to '" + valueInput + "'");
+}
+
+// this function gets a configuration field for a guild, given a channel and field
+function getConfig(channel, fieldInput) {
+    var field;
+    switch (fieldInput) {
+        case "prefix":
+            field = "prefix";
+            break;
+        case "displaytype":
+            field = "display_type";
+            break;
+    }
+    channel.send("'" + fieldInput + "' for this guild is set to '" + serverconfig[channel.guild.id][field] + "'");
 }
 
 
@@ -394,7 +439,7 @@ function saveID(channel, message) {
 // set prefix when guild is added
 client.on('guildCreate', guild => {
 	prefixes[guild.id] = "!";
-	saveGuild(guild, "!");
+	saveGuild(guild, "!", "image");
 });
 
 // remove prefix when guild is removed
@@ -409,20 +454,23 @@ client.on('guildDelete', guild => {
 client.on("message", async message => {
     // if there is no prefix, set one
     // this can happen for many reasons, the main reason is if the bot is added while the bot is offline
-    if (prefixes[message.guild.id] == undefined) {
-		prefixes[message.guild.id] = "!";
-		saveGuild(message.guild, "!");
+    if (serverconfig[message.guild.id] == undefined) {
+		serverconfig[message.guild.id] = {
+		    prefix: "!", 
+		    displayType: "image"
+		};
+		saveGuild(message.guild, "!", "image");
 	}
 	
 	// ignore messages if:
 	//  they are from a bot
 	//  it does not start with the prefix
 	//  it is from a DM channel
-    if (message.author.bot || message.content.indexOf(prefixes[message.guild.id]) !== 0 || message.channel instanceof Discord.DMChannel) return;
+    if (message.author.bot || message.content.indexOf(serverconfig[message.guild.id].prefix) !== 0 || message.channel instanceof Discord.DMChannel) return;
     
     // get array of arguments and command
-    var args = message.content.slice(prefixes[message.guild.id].length).trim().split(/ +/g);
-    var command = args.shift().toLowerCase();
+    var args = message.content.toLowerCase().slice(serverconfig[message.guild.id].prefix.length).trim().split(/ +/g);
+    var command = args.shift();
     
     /**
      * COMMANDS START -------------------------
@@ -435,6 +483,7 @@ client.on("message", async message => {
         // edit it with the time it took to send the message and api latency
         m.edit("Pong!\nMessage RTT: `" + (m.createdTimestamp - message.createdTimestamp) + "ms`\nAPI Latency: `" + Math.round(client.ping) + "ms`");
         if (dev) console.log("Executed ping in channel " + message.channel.id + " by " + message.author.id);
+        return;
     }
     
     // SCHEDULE command
@@ -503,6 +552,7 @@ client.on("message", async message => {
         // call send schedule
         sendSchedule(message.channel, selectorInput, typeInput, dateInput);
         if (dev) console.log("Executed schedule in channel " + message.channel.id + " by " + message.author.id);
+        return;
     }
     
     // AUTOSCHEDULE command
@@ -643,6 +693,7 @@ client.on("message", async message => {
             deleteAutoSchedule(message.channel);
             if (dev) console.log("Executed autoschedule delete in channel " + message.channel.id + " by " + message.author.id);
         }
+        return;
     }
     
     // EMERGENCY command
@@ -654,25 +705,55 @@ client.on("message", async message => {
     // HELP command
     if (command === "help") {
         // get the prefix to display it
-        var prefix = prefixes[message.guild.id];
-        // build embed
-		var embed = new Discord.RichEmbed()
-			.setTitle("TJHSST Schedule Bot Command List")
-			.setDescription("This bot serves TJHSST bell schedules\n```This guild's prefix is currently set to: \"" + prefix + "\"```")
-			.setColor(0x2d31ff)
-			.setThumbnail("https://i.imgur.com/FXO2ASN.png")
-			.addField(prefix + "help", "Displays this help message")
-			.addField(prefix + "ping", "Pings the bot")
-			.addField(prefix + "info", "Displays bot info")
-			.addField(prefix + "setprefix [*prefix*]", "Sets the bot command prefix for this guild (requires \"Manage Server\" permission)\n**prefix: **The prefix to use (will be truncated to 32 characters if needed)")
-			.addField(prefix + "schedule {*keyword* | [*selector*] [*type*]} [*date*]", "Gets schedule\n**keyword: **Selects schedule and type (yesterday | today | tomorrow)\n**selector: **Selects which schedule (last | this | next, default: this)\n**type: **Type of schedule (day | week | month, default: day)\n**date: **The date of the schedule (default: current date)")
-			.addField(prefix + "autoschedule", "Automatically sends schedules periodically to the current channel (requires \"Manage Server\" permission)\n")
-			.addField(prefix + "autoschedule set {*keyword* | [*selector*] *type*} *cron* [*flags*]", "Sets autoschedule in the current channel\n**keyword: **A keyword accepted by the schedule command\n**selector: **A selector accepted by the schedule command\n**type: **A schedule type accepted by the schedule command\n**cron: **A valid crontab describing when to send the schedule\n[Graphical Crontab Editor](http://corntab.com/)\n**flags: **Extra options, separated by spaces\n- **delete-old: **deletes old schedules")
-			.addField(prefix + "autoschedule execute", "Triggers execution of saved autoschedule, regardless of scheduled execution time")
-			.addField(prefix + "autoschedule show [*type*]", "Shows autoschedule information in the current channel\n**type: **Desired autoschedule information (definition | command | next, default: definition)")
-			.addField(prefix + "autoschedule delete", "Deletes the autoschedule from the current channel")
-			.addField(prefix + "emergency", "Gets emergency alerts")
-			.addField("Notes", "- Commands do NOT work in DM.\n- Arguments in [square brackets] are optional\n- Do not include brackets when typing commands.\n- The prefix must not have any whitespace in it");
+        var prefix = serverconfig[message.guild.id].prefix;
+        
+        // throw away the command, get the first argument and use that as the help command
+        command = args.shift();
+        
+    	var embed = new Discord.RichEmbed()
+    	embed.setColor(0x2d31ff)
+			.setThumbnail("https://i.imgur.com/FXO2ASN.png");
+        
+        if (command === undefined) {
+            // user has called help with no command
+            // build embed
+            embed.setTitle("TJHSST Schedule Bot Command List")
+                .setDescription("For additional help, use " + prefix + "help *command*, where *command* is the command you need help for.")
+    			.addField(prefix + "help [*command*]", "Displays help message\n**command: **command to get help for")
+    			.addField(prefix + "ping", "Pings the bot")
+    			.addField(prefix + "info", "Displays bot info")
+    			.addField(prefix + "serverconfig", "Sets or gets configuration for this guild (requires \"Manage Server\" permission)")
+    			.addField(prefix + "schedule", "Gets schedule")
+    			.addField(prefix + "autoschedule", "Automatically sends schedules periodically to the current channel (requires \"Manage Server\" permission)\n")
+    			.addField(prefix + "emergency", "Gets emergency alerts")
+        } else if (command === "serverconfig") {
+            // user has called help serverconfig
+            embed.setTitle("TJHSST Schedule Bot Command List - Server Config")
+                .setDescription("The serverconfig command sets or gets configuration for this guild. It requires the \"Manage Server\" permission.")
+                .addField(prefix + "serverconfig set *field* *value*", "Sets configuration for this guild\n**field: **Configuration field\n**value: **Configuration value")
+                .addField(prefix + "serverconfig get *field*", "Gets configuration for this guild\n**field: **Configuration field")
+                .addField("Configuration Field List", "- prefix\n- displaytype (in development)");
+        } else if (command === "schedule") {
+            // user has called help schedule
+            embed.setTitle("TJHSST Schedule Bot Command List - Schedule")
+                .setDescription("The schedule command gets schedules. Schedules can be selected either with a keyword or a selector and type. By default, schedules are generated relative to the current date, but the reference date can be specified if desired.")
+                .addField(prefix + "schedule *keyword* [*date*]", "**keyword: **Selects schedule and type (yesterday | today | tomorrow)\n**date: **The date of the schedule (default: current date)")
+                .addField(prefix + "schedule [*selector*] [*type*] [*date*]", "**selector: **Selects which schedule (last | this | next, default: this)\n**type: **Type of schedule (day | week | month, default: day)\n**date: **The date of the schedule (default: current date)");
+        } else if (command === "autoschedule") {
+            // user has called help autoschedule
+            embed.setTitle("TJHSST Schedule Bot Command List - Auto Schedule")
+                .setDescription("The autoschedule command sets automatic schedules. It requires the \"Manage Server\" permission. Autoschedules are defined using cron syntax. If you are not familiar with cron syntax, then a [Graphical Crontab Editor](http://corntab.com) can be used.")
+                .addField(prefix + "autoschedule set *keyword* *cron* [*flags*]", "**keyword: **A keyword accepted by the schedule command\n**cron: **A valid crontab describing when to send the schedule\n**flags: **Extra options, separated by spaces\n- **delete-old: **deletes old schedules")
+                .addField(prefix + "autoschedule set [*selector*] *type* *cron* [*flags*]", "**selector: **A selector accepted by the schedule command\n**type: **A schedule type accepted by the schedule command\n**cron: **A valid crontab describing when to send the schedule\n**flags: **Extra options, separated by spaces\n- **delete-old: **deletes old schedules")
+                .addField(prefix + "autoschedule execute", "Triggers execution of saved autoschedule, regardless of scheduled execution time")
+    			.addField(prefix + "autoschedule show [*type*]", "Shows autoschedule information in the current channel\n**type: **Desired autoschedule information (definition | command | next, default: definition)")
+    			.addField(prefix + "autoschedule delete", "Deletes the autoschedule from the current channel")
+        } else {
+            // user has called help with an invalid command, stop execution and return
+            message.channel.send("No additional help available for " + command);
+            return;
+        }
+        embed.addField("Notes", "- Commands do NOT work in DM.\n- Arguments in [square brackets] are optional\n- Do not include brackets when typing commands.");
 		// send
 		message.channel.send({embed})
 		    .catch((e) => {
@@ -683,19 +764,20 @@ client.on("message", async message => {
 		        }
 		    });
 	    if (dev) console.log("Executed help in channel " + message.channel.id + " by " + message.author.id);
+	    return;
     }
     
     // INFO command
     if (command === "info") {
         // get all the necessary information to display it
-        var prefix = prefixes[message.guild.id];
+        var prefix = serverconfig[message.guild.id].prefix;
 		var guilds = client.guilds.size;
 		var uptime = format(process.uptime() * 1000);
 		var version = pkg.version;
 		// build embed
 		var embed = new Discord.RichEmbed()
 			.setTitle("TJHSST Schedule Bot")
-			.setDescription("This bot serves TJHSST bell schedules\nUse `" + prefix + "help` to view commands\n[Add TJHSST Schedule Bot to your own server](https://discordapp.com/oauth2/authorize?client_id=491431910795509780&scope=bot&permissions=51200)\nCode on [GitHub](https://github.com/DarinMao/schedule-bot)")
+			.setDescription("This bot serves TJHSST bell schedules\nUse `" + prefix + "help` to view commands\nCode on [GitHub](https://github.com/DarinMao/schedule-bot)")
 			.setColor(0x2d31ff)
 			.setFooter("Ailuropoda Melanoleuca#0068 | Written using discord.js", "https://i.imgur.com/tymDoDZ.jpg")
 			.setThumbnail("https://i.imgur.com/FXO2ASN.png")
@@ -713,10 +795,21 @@ client.on("message", async message => {
 		        }
 		    });
 	    if (dev) console.log("Executed info in channel " + message.channel.id + " by " + message.author.id);
+	    return;
     }
     
-    // SETPREFIX command
-    if (command === "setprefix") {
+    // SERVERCONFIG command
+    if (command === "serverconfig") {
+        // throw away the command, get the first argument and use that as the serverconfig action
+        command = args.shift();
+        
+        if (command === undefined) {
+            // user has called autoschedule with no action
+            message.channel.send("Use serverconfig set, get, or show");
+            if (dev) console.log("Executed serverconfig in channel " + message.channel.id + " by " + message.author.id);
+            return;
+        }
+        
         // check for permissions
         // setprefix command requires the MANAGE_GUILD permission
         // unless they're me 
@@ -725,20 +818,63 @@ client.on("message", async message => {
 			return;
 		}
 		
-		if (args[0] == undefined) {
-		    // there's no prefix
-			message.channel.send("Please specify a prefix!");
-		} else {
-		    // there is a prefix
-		    // cut it to 32 characters
-		    prefix = args[0].substring(0, 32);
-		    // set the prefix
-			prefixes[message.guild.id] = prefix;
-			// save the prefix
-			saveGuild(message.guild, prefix);
-			message.channel.send("Set prefix for this guild to " + prefix);
+		if (command === "set") {
+		    // user has called serverconfig set
+		    // get arguments
+		    var field;
+		    var value;
+		    var arg;
+		    
+		    // next argument
+            arg = args.shift();
+            if (["prefix", "displaytype"].indexOf(arg) > -1) {
+                // if it's a valid field, set it
+                field = arg;
+            } else {
+                // invalid field, stop execution and return
+                message.channel.send("Invalid field!");
+                return;
+            }
+            
+            // next argument
+            arg = args.shift();
+            if (arg !== undefined) {
+                // if there is a value, set it
+                value = arg;
+            } else {
+                // no value, stop execution and return
+                message.channel.send("Please specify a value!");
+                return;
+            }
+            
+            // call set config
+            setConfig(message.channel, field, value);
+            if (dev) console.log("Executed serverconfig set in channel " + message.channel.id + " by " + message.author.id);
 		}
-		if (dev) console.log("Executed setprefix in channel " + message.channel.id + " by " + message.author.id);
+		
+		if (command === "get") {
+		    // user has called serverconfig get
+		    // get arguments
+		    var field;
+		    var arg;
+		    
+		    // next argument
+		    arg = args.shift();
+		    if (["prefix", "displaytype"].indexOf(arg) > -1) {
+		        // if it's a valid field, set it
+		        field = arg;
+		    } else {
+		        // invalid field, stop execution and return
+		        message.channel.send("Invalid field!");
+		        return;
+		    }
+		    
+		    // call get config
+		    getConfig(message.channel, field);
+		    if (dev) console.log("Executed serverconfig get in channel " + message.channel.id + " by " + message.author.id);
+		}
+		
+		return;
     }
 });
 
