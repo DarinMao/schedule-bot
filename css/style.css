@@ -1,0 +1,48 @@
+body {
+	background-color: #36393e;
+	padding-top: 4.125rem;
+	color: #99aab5;
+}
+
+img#logo {
+	margin-right: 1rem;
+	width: 2.5rem;
+}
+
+.navbar {
+	background-color: inherit;
+	padding-bottom: 0;
+}
+
+.jumbotron,.commands-container {
+	background-color: #2a2d32;
+}
+
+.navbar-dark .navbar-nav .nav-item > .nav-link {
+	padding-left: 1rem;
+	padding-right: 1rem;
+}
+
+.navbar-dark .navbar-nav .active > .nav-link {
+	background-color: #2a2d32;
+	font-weight: 600;
+}
+
+.navbar-collapse {
+	margin: 0.5rem -1rem 0 -1rem;
+}
+
+@media (min-width: 768px) {
+	.navbar-collapse {
+		margin: 0;
+	}
+
+	.navbar-dark .navbar-nav .nav-item > .nav-link {
+		padding-left: 0.5rem;
+		padding-right: 0.5rem;
+	}
+
+	.navbar-dark .navbar-nav .active > .nav-link {
+		border-radius: 0.3rem;
+	}
+}

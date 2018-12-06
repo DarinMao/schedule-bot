@@ -1,0 +1,21 @@
+p.jumbotron-text {
+	font-size: 1.5em;
+}
+
+h1 {
+	color: #ffffff;
+}
+
+a.btn {
+	width: 100%;
+	display: block;
+	margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+	a.btn {
+		width: auto;
+		display: inline-block;
+		margin-right: 0.5rem;
+	}
+}
