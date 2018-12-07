@@ -33,6 +33,7 @@ h2 {
 
 .commands > .row > .cmd-usage > .usage-parts {
 	display: inline-block;
+	width: 80%;
 }
 
 .commands > .row > .cmd-usage > .usage-parts > .usage-part {
