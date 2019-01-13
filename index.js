@@ -464,12 +464,12 @@ client.on("message", async message => {
 	
 	// ignore messages if:
 	//  they are from a bot
-	//  it does not start with the prefix
+	//  it does not start with the prefix or mention
 	//  it is from a DM channel
-    if (message.author.bot || message.content.indexOf(serverconfig[message.guild.id].prefix) !== 0 || message.channel instanceof Discord.DMChannel) return;
+    if (message.author.bot || (message.content.indexOf(serverconfig[message.guild.id].prefix) !== 0 && !message.isMentioned(client.user.id)) || message.channel instanceof Discord.DMChannel) return;
     
     // get array of arguments and command
-    var args = message.content.toLowerCase().slice(serverconfig[message.guild.id].prefix.length).trim().split(/ +/g);
+    var args = message.content.toLowerCase().replace(serverconfig[message.guild.id].prefix, "").replace(`<@${client.user.id}>`, "").trim().split(/ +/g);
     var command = args.shift();
     
     /**
@@ -777,8 +777,9 @@ client.on("message", async message => {
 		// build embed
 		var embed = new Discord.RichEmbed()
 			.setTitle("TJHSST Schedule Bot")
-			.setDescription("This bot serves TJHSST bell schedules\nUse `" + prefix + "help` to view commands\nCode on [GitHub](https://github.com/DarinMao/schedule-bot)")
+			.setDescription("This bot serves TJHSST bell schedules\nUse `" + prefix + "help` to view commands\nCode on [GitHub](https://github.com/DarinMao/schedule-bot)\n[Add Schedules Bot to your own server](https://discordapp.com/oauth2/authorize?client_id=491431910795509780&scope=bot&permissions=52224)")
 			.setColor(0x2d31ff)
+			.setURL("https://darinmao.tk/schedule-bot")
 			.setFooter("Ailuropoda Melanoleuca#0068 | Written using discord.js", "https://i.imgur.com/tymDoDZ.jpg")
 			.setThumbnail("https://i.imgur.com/FXO2ASN.png")
 			.addField("Prefix", prefix, true)
