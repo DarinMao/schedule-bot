@@ -77,7 +77,7 @@ pool.query("SELECT serverid,prefix,display_type FROM servers", (err, results, fi
 		};
 	}
 	console.log(serverconfig);
-	console.log("Loaded " + results.length + " prefixes");
+	console.log("Loaded " + results.length + " servers");
 });
 
 // GRAB AUTOSCHEDULES FROM THE DATABASE
@@ -209,10 +209,7 @@ const selectorOffset = {
     "this": 0,
     "next": 1
 }
-function sendSchedule(channel, selectorInput, typeInput, dateInput) {
-    sendSchedule(channel, selectorInput, typeInput, dateInput, false)
-}
-function sendSchedule(channel, selectorInput, typeInput, dateInput, autoscheduleSaveID) {
+function sendSchedule(channel, selectorInput, typeInput, dateInput, autoscheduleSaveID=false) {
     // this command takes a while to run, so start typing
     channel.startTyping();
     // set date using offset
@@ -236,13 +233,14 @@ function sendSchedule(channel, selectorInput, typeInput, dateInput, autoschedule
     var requestArgs = "type=" + typeInput + "&date=" + dateFormat(date, "UTC:yyyy-mm-dd");
     // build url
     var url = "https://schedules.sites.tjhsst.edu/schedule/?" + requestArgs;
+	console.log(url, filename, webshotOptions);
     // webshot
     webshot(url, filename, webshotOptions, (err) => {
         // send it
         channel.send(new Discord.Attachment(fs.createReadStream(filename), "schedule.png"))
             .then(message => {
                 // delete the image
-                fs.unlink(filename, (err) => {});
+                //fs.unlink(filename, (err) => {});
                 // save id if needed
                 if (autoscheduleSaveID) {
                     saveID(channel, message);
