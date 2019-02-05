@@ -233,7 +233,6 @@ function sendSchedule(channel, selectorInput, typeInput, dateInput, autoschedule
     var requestArgs = "type=" + typeInput + "&date=" + dateFormat(date, "UTC:yyyy-mm-dd");
     // build url
     var url = "https://schedules.sites.tjhsst.edu/schedule/?" + requestArgs;
-	console.log(url, filename, webshotOptions);
     // webshot
     webshot(url, filename, webshotOptions, (err) => {
         // send it
